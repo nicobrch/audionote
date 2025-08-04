@@ -5,6 +5,9 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "langchain-core>=0.3.72",
+    "langchain-ollama>=0.3.6",
+    "langchain-postgres>=0.0.15",
     "openai-whisper>=20250625",
     "peewee>=3.18.2",
     "setuptools-rust>=1.11.1",
