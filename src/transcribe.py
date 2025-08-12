@@ -2,6 +2,7 @@ import whisper
 import tempfile
 import os
 import torch
+import gc
 import streamlit as st
 
 
@@ -17,6 +18,23 @@ def check_cuda_availability() -> tuple[bool, str]:
         return True, f"CUDA GPU: {device_name}"
     else:
         return False, "CPU"
+
+
+def unload_whisper_model():
+    """
+    Unload Whisper model from memory and clear GPU cache.
+    """
+    try:
+        # Clear GPU cache if CUDA is available
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        # Force garbage collection
+        gc.collect()
+
+        st.info("🗑️ Whisper model unloaded from memory")
+    except Exception as e:
+        st.warning(f"Warning during model cleanup: {str(e)}")
 
 
 def transcribe_audio(
@@ -55,21 +73,45 @@ def transcribe_audio(
         with st.spinner(f"Loading Whisper model ({model_size}) on {device_info}..."):
             model = whisper.load_model(model_size, device=device)
 
-        # Handle Streamlit uploaded file
-        if hasattr(audio_file, 'read'):
-            # Create a temporary file to save the uploaded audio
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as temp_file:
-                temp_file.write(audio_file.read())
-                temp_file_path = temp_file.name
+        try:
+            # Handle Streamlit uploaded file
+            if hasattr(audio_file, 'read'):
+                # Create a temporary file to save the uploaded audio
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as temp_file:
+                    temp_file.write(audio_file.read())
+                    temp_file_path = temp_file.name
 
-            try:
-                # Transcribe the audio
+                try:
+                    # Transcribe the audio
+                    with st.spinner("Transcribing audio..."):
+                        if language == "auto":
+                            result = model.transcribe(temp_file_path)
+                        else:
+                            result = model.transcribe(
+                                temp_file_path, language=language)
+
+                    return {
+                        "text": result["text"],
+                        "language": result.get("language", language),
+                        "segments": result.get("segments", []),
+                        "model_used": model_size,
+                        "device_used": device_info,
+                        "success": True
+                    }
+
+                finally:
+                    # Clean up temporary file
+                    if os.path.exists(temp_file_path):
+                        os.unlink(temp_file_path)
+
+            else:
+                # Handle file path
                 with st.spinner("Transcribing audio..."):
                     if language == "auto":
-                        result = model.transcribe(temp_file_path)
+                        result = model.transcribe(audio_file)
                     else:
                         result = model.transcribe(
-                            temp_file_path, language=language)
+                            audio_file, language=language)
 
                 return {
                     "text": result["text"],
@@ -80,27 +122,11 @@ def transcribe_audio(
                     "success": True
                 }
 
-            finally:
-                # Clean up temporary file
-                if os.path.exists(temp_file_path):
-                    os.unlink(temp_file_path)
-
-        else:
-            # Handle file path
-            with st.spinner("Transcribing audio..."):
-                if language == "auto":
-                    result = model.transcribe(audio_file)
-                else:
-                    result = model.transcribe(audio_file, language=language)
-
-            return {
-                "text": result["text"],
-                "language": result.get("language", language),
-                "segments": result.get("segments", []),
-                "model_used": model_size,
-                "device_used": device_info,
-                "success": True
-            }
+        finally:
+            # Always unload Whisper model from memory
+            if 'model' in locals():
+                del model
+            unload_whisper_model()
 
     except Exception as e:
         return {

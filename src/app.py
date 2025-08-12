@@ -58,11 +58,20 @@ def main():
                 help="Select language or use auto-detection"
             )
 
+            ollama_model = st.selectbox(
+                "AI Model for Formatting",
+                options=["gpt-oss:20b", "gemma3:4b",
+                         "gemma3:12b", "qwen3:4b", "qwen3:8b"],
+                index=0,  # Default to "gpt-oss:20b"
+                help="AI model to use for transcription formatting and error correction"
+            )
+
             # Transcribe button
             if st.button("🎯 Transcribe Audio", type="primary"):
                 st.session_state.start_transcription = True
                 st.session_state.model_size = model_size
                 st.session_state.language = language
+                st.session_state.ollama_model = ollama_model
 
     # Main content area
     st.title("🎵 AudioNote")
@@ -98,14 +107,17 @@ def main():
                 st.success("✅ Transcription completed successfully!")
 
                 # Display metadata
-                col1, col2, col3, col4 = st.columns(4)
+                col1, col2, col3, col4, col5 = st.columns(5)
                 with col1:
-                    st.metric("Model Used", result['model_used'])
+                    st.metric("Whisper Model", result['model_used'])
                 with col2:
                     st.metric("Detected Language", result['language'].upper())
                 with col3:
                     st.metric("Device", result.get('device_used', 'N/A'))
                 with col4:
+                    st.metric("AI Model", st.session_state.get(
+                        'ollama_model', 'N/A'))
+                with col5:
                     st.metric("Segments", len(result.get('segments', [])))
 
                 # Process transcription with AI formatting
@@ -116,7 +128,8 @@ def main():
                     if ollama_available:
                         formatted_text = create_formatted_transcription(
                             result['text'],
-                            result.get('segments', [])
+                            result.get('segments', []),
+                            st.session_state.get('ollama_model', 'gpt-oss:20b')
                         )
                         st.session_state.formatted_transcription = formatted_text
                         st.session_state.current_result_id = id(result)
