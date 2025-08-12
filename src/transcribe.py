@@ -1,8 +1,22 @@
 import whisper
 import tempfile
 import os
-from typing import Optional, Union
+import torch
 import streamlit as st
+
+
+def check_cuda_availability() -> tuple[bool, str]:
+    """
+    Check if CUDA is available for GPU acceleration.
+
+    Returns:
+        tuple: (is_available, device_info)
+    """
+    if torch.cuda.is_available():
+        device_name = torch.cuda.get_device_name(0)
+        return True, f"CUDA GPU: {device_name}"
+    else:
+        return False, "CPU"
 
 
 def transcribe_audio(
@@ -33,9 +47,13 @@ def transcribe_audio(
         raise ValueError(f"Language must be one of: {valid_languages}")
 
     try:
+        # Check CUDA availability
+        cuda_available, device_info = check_cuda_availability()
+        device = "cuda" if cuda_available else "cpu"
+
         # Load the Whisper model
-        with st.spinner(f"Loading Whisper model ({model_size})..."):
-            model = whisper.load_model(model_size)
+        with st.spinner(f"Loading Whisper model ({model_size}) on {device_info}..."):
+            model = whisper.load_model(model_size, device=device)
 
         # Handle Streamlit uploaded file
         if hasattr(audio_file, 'read'):
@@ -58,6 +76,7 @@ def transcribe_audio(
                     "language": result.get("language", language),
                     "segments": result.get("segments", []),
                     "model_used": model_size,
+                    "device_used": device_info,
                     "success": True
                 }
 
@@ -79,6 +98,7 @@ def transcribe_audio(
                 "language": result.get("language", language),
                 "segments": result.get("segments", []),
                 "model_used": model_size,
+                "device_used": device_info,
                 "success": True
             }
 
@@ -88,6 +108,7 @@ def transcribe_audio(
             "language": language,
             "segments": [],
             "model_used": model_size,
+            "device_used": "N/A",
             "success": False,
             "error": str(e)
         }

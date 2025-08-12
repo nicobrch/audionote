@@ -1,5 +1,5 @@
 import streamlit as st
-from transcribe import transcribe_audio, format_transcription_segments
+from transcribe import transcribe_audio, format_transcription_segments, check_cuda_availability
 
 
 def main():
@@ -26,6 +26,13 @@ def main():
 
             # Transcription settings
             st.header("Transcription Settings")
+
+            # Display CUDA availability
+            cuda_available, device_info = check_cuda_availability()
+            if cuda_available:
+                st.success(f"🚀 GPU Available: {device_info}")
+            else:
+                st.info(f"💻 Using CPU: {device_info}")
 
             model_size = st.selectbox(
                 "Whisper Model Size",
@@ -82,12 +89,14 @@ def main():
                 st.success("✅ Transcription completed successfully!")
 
                 # Display metadata
-                col1, col2, col3 = st.columns(3)
+                col1, col2, col3, col4 = st.columns(4)
                 with col1:
                     st.metric("Model Used", result['model_used'])
                 with col2:
                     st.metric("Detected Language", result['language'].upper())
                 with col3:
+                    st.metric("Device", result.get('device_used', 'N/A'))
+                with col4:
                     st.metric("Segments", len(result.get('segments', [])))
 
                 # Display transcription text
