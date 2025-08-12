@@ -131,12 +131,17 @@ def main():
                 formatted_text = st.session_state.get(
                     'formatted_transcription', result['text'])
 
-                st.text_area(
-                    "Formatted Transcription",
-                    value=formatted_text,
-                    height=400,
-                    help="AI-processed transcription with corrections, formatting, and strategic timestamps"
-                )
+                # Display using markdown for proper formatting
+                st.markdown(formatted_text)
+
+                # Show raw text in expandable section for reference
+                with st.expander("📋 View Raw Transcription"):
+                    st.text_area(
+                        "Raw Transcription",
+                        value=result['text'],
+                        height=200,
+                        help="Original unprocessed transcription from Whisper"
+                    )
 
                 # Download button for formatted transcription
                 st.download_button(
