@@ -1,5 +1,6 @@
 import streamlit as st
-from transcribe import transcribe_audio, format_transcription_segments, check_cuda_availability
+from transcribe import transcribe_audio, check_cuda_availability
+from formatting import create_formatted_transcription, check_ollama_availability
 
 
 def main():
@@ -33,6 +34,14 @@ def main():
                 st.success(f"🚀 GPU Available: {device_info}")
             else:
                 st.info(f"💻 Using CPU: {device_info}")
+
+            # Display Ollama availability
+            ollama_available, ollama_status = check_ollama_availability()
+            if ollama_available:
+                st.success(f"🤖 AI Formatting: Available")
+            else:
+                st.warning(f"🤖 AI Formatting: Unavailable")
+                st.caption(ollama_status)
 
             model_size = st.selectbox(
                 "Whisper Model Size",
@@ -99,32 +108,41 @@ def main():
                 with col4:
                     st.metric("Segments", len(result.get('segments', [])))
 
-                # Display transcription text
-                st.subheader("📝 Transcription")
+                # Process transcription with AI formatting
+                if 'formatted_transcription' not in st.session_state or st.session_state.get('current_result_id') != id(result):
+                    # Check Ollama availability
+                    ollama_available, ollama_status = check_ollama_availability()
+
+                    if ollama_available:
+                        formatted_text = create_formatted_transcription(
+                            result['text'],
+                            result.get('segments', [])
+                        )
+                        st.session_state.formatted_transcription = formatted_text
+                        st.session_state.current_result_id = id(result)
+                    else:
+                        st.warning(
+                            f"⚠️ AI formatting unavailable: {ollama_status}")
+                        st.session_state.formatted_transcription = result['text']
+                        st.session_state.current_result_id = id(result)
+
+                # Display formatted transcription
+                st.subheader("📝 AI-Processed Transcription")
+                formatted_text = st.session_state.get(
+                    'formatted_transcription', result['text'])
+
                 st.text_area(
-                    "Full Text",
-                    value=result['text'],
-                    height=200,
-                    help="Complete transcription of the audio file"
+                    "Formatted Transcription",
+                    value=formatted_text,
+                    height=400,
+                    help="AI-processed transcription with corrections, formatting, and strategic timestamps"
                 )
 
-                # Display timestamped segments
-                if result.get('segments'):
-                    st.subheader("⏱️ Timestamped Segments")
-                    formatted_segments = format_transcription_segments(
-                        result['segments'])
-                    st.text_area(
-                        "Segments with Timestamps",
-                        value=formatted_segments,
-                        height=300,
-                        help="Transcription broken down by time segments"
-                    )
-
-                # Download button for transcription
+                # Download button for formatted transcription
                 st.download_button(
-                    label="💾 Download Transcription",
-                    data=result['text'],
-                    file_name=f"{uploaded_file.name}_transcription.txt",
+                    label="💾 Download Formatted Transcription",
+                    data=formatted_text,
+                    file_name=f"{uploaded_file.name}_formatted_transcription.txt",
                     mime="text/plain"
                 )
 
